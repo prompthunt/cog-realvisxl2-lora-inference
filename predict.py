@@ -22,6 +22,7 @@ from diffusers import (
     StableDiffusionXLInpaintPipeline,
     ControlNetModel,
     StableDiffusionXLControlNetPipeline,
+    StableDiffusionXLControlNetImg2ImgPipeline,
     StableDiffusionXLControlNetInpaintPipeline,
 )
 from diffusers.models.attention_processor import LoRAAttnProcessor2_0
@@ -420,6 +421,17 @@ class Predictor(BasePredictor):
                 vae=self.txt2img_pipe.vae,
             )
 
+            self.controlnet_pipe_img2img = StableDiffusionXLControlNetImg2ImgPipeline(
+                controlnet=self.controlnet,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
+            )
+
             print("Loading controlnet inpaint pipeline")
             self.controlnet_pipe_inpaint = StableDiffusionXLControlNetInpaintPipeline(
                 controlnet=self.controlnet,
@@ -447,10 +459,12 @@ class Predictor(BasePredictor):
             print("Loading ssd lora weights...")
             self.load_trained_weights(lora_url, self.txt2img_pipe)
             self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
+            self.load_trained_weights(lora_url, self.controlnet_pipe_img2img)
             self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
             self.load_trained_weights(lora_url, self.inpaint_pipe)
             self.txt2img_pipe.to("cuda")
             self.controlnet_pipe_txt2img.to("cuda")
+            self.controlnet_pipe_img2img.to("cuda")
             self.controlnet_pipe_inpaint.to("cuda")
             self.inpaint_pipe.to("cuda")
             self.is_lora = True
