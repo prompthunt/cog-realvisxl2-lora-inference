@@ -432,14 +432,27 @@ class Predictor(BasePredictor):
                 vae=self.txt2img_pipe.vae,
             )
 
+            print("Loading SDXL inpaint pipeline...")
+            self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+                vae=self.txt2img_pipe.vae,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+            )
+
             # TODO: LOAD ALL PIPELINE LORA WEIGHTS
             print("Loading ssd lora weights...")
             self.load_trained_weights(lora_url, self.txt2img_pipe)
             self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
             self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
+            self.load_trained_weights(lora_url, self.inpaint_pipe)
             self.txt2img_pipe.to("cuda")
             self.controlnet_pipe_txt2img.to("cuda")
             self.controlnet_pipe_inpaint.to("cuda")
+            self.inpaint_pipe.to("cuda")
             self.is_lora = True
 
             # print("Loading SDXL img2img pipeline...")
@@ -453,18 +466,6 @@ class Predictor(BasePredictor):
             #     scheduler=self.txt2img_pipe.scheduler,
             # )
             # self.img2img_pipe.to("cuda")
-
-            # print("Loading SDXL inpaint pipeline...")
-            # self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
-            #     vae=self.txt2img_pipe.vae,
-            #     text_encoder=self.txt2img_pipe.text_encoder,
-            #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            #     tokenizer=self.txt2img_pipe.tokenizer,
-            #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            #     unet=self.txt2img_pipe.unet,
-            #     scheduler=self.txt2img_pipe.scheduler,
-            # )
-            # self.inpaint_pipe.to("cuda")
 
             # print("Loading SDXL refiner pipeline...")
 
@@ -663,7 +664,8 @@ class Predictor(BasePredictor):
         inpaint_kwargs["negative_prompt"] = inpaint_negative_prompt
         inpaint_kwargs["image"] = upscaled_face
         inpaint_kwargs["mask_image"] = cropped_mask
-        inpaint_kwargs["control_image"] = cropped_control
+        if cropped_control:
+            inpaint_kwargs["control_image"] = cropped_control
         inpaint_kwargs["width"] = cropped_face.width
         inpaint_kwargs["height"] = cropped_face.height
         inpaint_kwargs["strength"] = inpaint_strength
@@ -671,9 +673,14 @@ class Predictor(BasePredictor):
         inpaint_kwargs["guidance_scale"] = inpaint_guidance_scale
         inpaint_kwargs["generator"] = torch.Generator("cuda").manual_seed(seed)
 
-        inpaint_result = self.controlnet_pipe_inpaint(
-            **inpaint_kwargs,
-        )
+        if cropped_control:
+            inpaint_result = self.controlnet_pipe_inpaint(
+                **inpaint_kwargs,
+            )
+        else:
+            inpaint_result = self.inpaint_pipe(
+                **inpaint_kwargs,
+            )
 
         pasted_image = paste_inpaint_into_original_image(
             output.images[0],
