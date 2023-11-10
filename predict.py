@@ -406,7 +406,7 @@ class Predictor(BasePredictor):
         if pose_image:
             print("controlnet mode")
             loaded_image = self.load_image(pose_image)
-            sdxl_kwargs["strength"] = prompt_strength
+            sdxl_kwargs["image"] = loaded_image
 
             # Get the dimensions (height and width) of the loaded image
             image_width, image_height = loaded_image.size
