@@ -44,6 +44,8 @@ import math
 
 from dataset_and_utils import TokenEmbeddingsHandler
 
+from image_processing import face_mask_google_mediapipe
+
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
 
@@ -265,6 +267,9 @@ class Predictor(BasePredictor):
             le=1.0,
             default=0.6,
         ),
+        mask_blur_amount: float = Input(
+            description="Amount of blur to apply to the mask.", default=8.0
+        ),
     ) -> List[Path]:
         # Check if there is a lora_url
         if lora_url == None:
@@ -478,11 +483,16 @@ class Predictor(BasePredictor):
 
         output_paths = []
         for i, _ in enumerate(output.images):
-            # if nsfw:
-            #     print(f"NSFW content detected in image {i}")
-            #     continue
             output_path = f"/tmp/out-{i}.png"
             output.images[i].save(output_path)
+            output_paths.append(Path(output_path))
+
+        face_masks = face_mask_google_mediapipe(output.images, mask_blur_amount)
+
+        # Add face masks to output
+        for i, _ in enumerate(face_masks):
+            output_path = f"/tmp/out-{i}-mask.png"
+            face_masks[i].save(output_path)
             output_paths.append(Path(output_path))
 
         if len(output_paths) == 0:
