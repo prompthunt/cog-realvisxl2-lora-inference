@@ -498,12 +498,6 @@ class Predictor(BasePredictor):
 
         face_masks = face_mask_google_mediapipe(output.images, mask_blur_amount)
 
-        # Add face masks to output
-        for i, _ in enumerate(face_masks):
-            output_path = f"/tmp/out-{i}-mask.png"
-            face_masks[i].save(output_path)
-            output_paths.append(Path(output_path))
-
         # Based on face detection, crop base image, mask image and pose image (if available)
         # to the face and save them to output_paths
         (
@@ -515,6 +509,12 @@ class Predictor(BasePredictor):
         ) = crop_faces_to_square(
             output.images[0], face_masks[0], pose_image, face_padding, face_resize_to
         )
+
+        # Add face masks to output
+        for i, _ in enumerate(face_masks):
+            output_path = f"/tmp/out-{i}-mask.png"
+            face_masks[i].save(output_path)
+            output_paths.append(Path(output_path))
 
         # Add all cropped images to output
         output_path = f"/tmp/out-cropped-face.png"
