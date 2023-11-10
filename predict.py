@@ -258,7 +258,7 @@ class Predictor(BasePredictor):
         new_height = math.ceil(height / 64) * 64
         # Resize the image if needed
         if new_width != width or new_height != height:
-            img = img.resize((new_width, new_height), Image.ANTIALIAS)
+            img = img.resize((new_width, new_height), Image.LANCZOS)
 
         # Convert the image to RGB mode
         img = img.convert("RGB")
