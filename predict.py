@@ -45,11 +45,16 @@ import math
 
 from dataset_and_utils import TokenEmbeddingsHandler
 
-from image_processing import face_mask_google_mediapipe, crop_faces_to_square
+from image_processing import (
+    face_mask_google_mediapipe,
+    crop_faces_to_square,
+    paste_inpaint_into_original_image,
+)
 
 from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
+import cv2
 
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
@@ -80,6 +85,36 @@ def download_weights(url, dest):
 
 
 class Predictor(BasePredictor):
+    def upscale_image_pil(self, img: Image.Image) -> Image.Image:
+        weight = 0.5
+        try:
+            # Convert PIL Image to numpy array if necessary
+            img = np.array(img)
+            if len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):
+                # Convert grayscale to RGB
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            h, w = img.shape[0:2]
+            if h < 300:
+                img = cv2.resize(img, (w * 2, h * 2), interpolation=cv2.INTER_LANCZOS4)
+
+            # Enhance the image using GFPGAN
+            _, _, output = self.face_enhancer.enhance(
+                img,
+                has_aligned=False,
+                only_center_face=False,
+                paste_back=True,
+                weight=weight,
+            )
+
+            # Convert numpy array back to PIL Image
+            output = Image.fromarray(output)
+
+            return output
+
+        except Exception as error:
+            print("An exception occurred:", error)
+            raise
+
     def load_trained_weights(self, weights_url, pipe):
         # Get the TAR archive content
         weights_tar_data = requests.get(weights_url).content
@@ -324,6 +359,31 @@ class Predictor(BasePredictor):
             description="Resize the face bounding box to this size (in pixels).",
             default=768,
         ),
+        inpaint_prompt: str = Input(
+            description="Input inpaint prompt", default="A photo of TOK"
+        ),
+        inpaint_negative_prompt: str = Input(
+            description="Input inpaint negative prompt",
+            default="(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch)",
+        ),
+        inpaint_strength: float = Input(
+            description="Prompt strength when using inpaint. 1.0 corresponds to full destruction of information in image",
+            ge=0.0,
+            le=1.0,
+            default=0.35,
+        ),
+        inpaint_num_inference_steps: int = Input(
+            description="Number of denoising steps for inpainting",
+            ge=1,
+            le=500,
+            default=25,
+        ),
+        inpaint_guidance_scale: float = Input(
+            description="Scale for classifier-free guidance for inpainting",
+            ge=1,
+            le=50,
+            default=3.0,
+        ),
     ) -> List[Path]:
         # Check if there is a lora_url
         if lora_url == None:
@@ -360,12 +420,26 @@ class Predictor(BasePredictor):
                 vae=self.txt2img_pipe.vae,
             )
 
+            print("Loading controlnet inpaint pipeline")
+            self.controlnet_pipe_inpaint = StableDiffusionXLControlNetInpaintPipeline(
+                controlnet=self.controlnet,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
+            )
+
             # TODO: LOAD ALL PIPELINE LORA WEIGHTS
             print("Loading ssd lora weights...")
             self.load_trained_weights(lora_url, self.txt2img_pipe)
             self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
+            self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
             self.txt2img_pipe.to("cuda")
             self.controlnet_pipe_txt2img.to("cuda")
+            self.controlnet_pipe_inpaint.to("cuda")
             self.is_lora = True
 
             # print("Loading SDXL img2img pipeline...")
@@ -580,6 +654,44 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/out-cropped-control.png"
             cropped_control.save(output_path)
             output_paths.append(Path(output_path))
+
+        upscaled_face = self.upscale_image_pil(cropped_face)
+
+        inpaint_kwargs = {}
+
+        inpaint_kwargs["prompt"] = inpaint_prompt
+        inpaint_kwargs["negative_prompt"] = inpaint_negative_prompt
+        inpaint_kwargs["image"] = upscaled_face
+        inpaint_kwargs["mask_image"] = cropped_mask
+        inpaint_kwargs["control_image"] = cropped_control
+        inpaint_kwargs["width"] = cropped_face.width
+        inpaint_kwargs["height"] = cropped_face.height
+        inpaint_kwargs["strength"] = inpaint_strength
+        inpaint_kwargs["num_inference_steps"] = inpaint_num_inference_steps
+        inpaint_kwargs["guidance_scale"] = inpaint_guidance_scale
+        inpaint_kwargs["generator"] = torch.Generator("cuda").manual_seed(seed)
+
+        inpaint_result = self.controlnet_pipe_inpaint(
+            **inpaint_kwargs,
+        )
+
+        pasted_image = paste_inpaint_into_original_image(
+            output.images[0],
+            cropped_mask,
+            left_top,
+            inpaint_result.images[0],
+            orig_size,
+        )
+
+        # Add inpaint result to output
+        output_path = f"/tmp/out-inpaint.png"
+        inpaint_result.images[0].save(output_path)
+        output_paths.append(Path(output_path))
+
+        # Add pasted image to output
+        output_path = f"/tmp/out-pasted.png"
+        pasted_image.save(output_path)
+        output_paths.append(Path(output_path))
 
         if len(output_paths) == 0:
             raise Exception(
