@@ -298,6 +298,7 @@ class Predictor(BasePredictor):
                 tokenizer_2=self.txt2img_pipe.tokenizer_2,
                 unet=self.txt2img_pipe.unet,
                 scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
             )
 
             # TODO: LOAD ALL PIPELINE LORA WEIGHTS
