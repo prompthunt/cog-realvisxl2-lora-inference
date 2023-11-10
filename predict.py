@@ -47,6 +47,10 @@ from dataset_and_utils import TokenEmbeddingsHandler
 
 from image_processing import face_mask_google_mediapipe, crop_faces_to_square
 
+from gfpgan import GFPGANer
+from realesrgan.utils import RealESRGANer
+from basicsr.archs.srvgg_arch import SRVGGNetCompact
+
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
 
@@ -163,6 +167,47 @@ class Predictor(BasePredictor):
         """Load the model into memory to make running multiple predictions efficient"""
         start = time.time()
         self.tuned_model = False
+
+        if not os.path.exists("gfpgan/weights/realesr-general-x4v3.pth"):
+            os.system(
+                "wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth -P ./gfpgan/weights"
+            )
+        if not os.path.exists("gfpgan/weights/GFPGANv1.4.pth"):
+            os.system(
+                "wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth -P ./gfpgan/weights"
+            )
+
+        # background enhancer with RealESRGAN
+        model = SRVGGNetCompact(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_conv=32,
+            upscale=4,
+            act_type="prelu",
+        )
+        model_path = "gfpgan/weights/realesr-general-x4v3.pth"
+        half = True if torch.cuda.is_available() else False
+        self.upsampler = RealESRGANer(
+            scale=2,
+            model_path=model_path,
+            model=model,
+            tile=0,
+            tile_pad=10,
+            pre_pad=0,
+            half=half,
+        )
+
+        # Use GFPGAN for face enhancement
+        self.face_enhancer = GFPGANer(
+            model_path="gfpgan/weights/GFPGANv1.4.pth",
+            upscale=1,
+            arch="clean",
+            channel_multiplier=2,
+            bg_upsampler=self.upsampler,
+        )
+        self.current_version = "v1.4"
+
         print("setup took: ", time.time() - start)
         # self.txt2img_pipe.__class__.encode_prompt = new_encode_prompt
 
@@ -509,7 +554,11 @@ class Predictor(BasePredictor):
             left_top,
             orig_size,
         ) = crop_faces_to_square(
-            output.images[0], face_masks[0], loaded_pose_image, face_padding, face_resize_to
+            output.images[0],
+            face_masks[0],
+            loaded_pose_image,
+            face_padding,
+            face_resize_to,
         )
 
         # Add face masks to output
