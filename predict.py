@@ -417,9 +417,11 @@ class Predictor(BasePredictor):
             for k, v in self.token_map.items():
                 prompt = prompt.replace(k, v)
         print(f"Prompt: {prompt}")
+        loaded_pose_image = None
         if pose_image:
             print("controlnet mode")
             loaded_image = self.load_image(pose_image)
+            loaded_pose_image = loaded_image
             sdxl_kwargs["image"] = loaded_image
 
             # Get the dimensions (height and width) of the loaded image
@@ -507,7 +509,7 @@ class Predictor(BasePredictor):
             left_top,
             orig_size,
         ) = crop_faces_to_square(
-            output.images[0], face_masks[0], pose_image, face_padding, face_resize_to
+            output.images[0], face_masks[0], loaded_pose_image, face_padding, face_resize_to
         )
 
         # Add face masks to output
@@ -525,9 +527,10 @@ class Predictor(BasePredictor):
         cropped_mask.save(output_path)
         output_paths.append(Path(output_path))
 
-        output_path = f"/tmp/out-cropped-control.png"
-        cropped_control.save(output_path)
-        output_paths.append(Path(output_path))
+        if cropped_control:
+            output_path = f"/tmp/out-cropped-control.png"
+            cropped_control.save(output_path)
+            output_paths.append(Path(output_path))
 
         if len(output_paths) == 0:
             raise Exception(
