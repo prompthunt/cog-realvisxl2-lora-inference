@@ -221,6 +221,7 @@ def crop_faces_to_square(
     mask_image: Image.Image,
     control_image: Image.Image,
     padding: float = 0.5,
+    resize_to: Optional[int] = 768,
 ):
     # find the center of mass of the mask
     com = _center_of_mass_and_bounding_box(mask_image)
@@ -231,18 +232,22 @@ def crop_faces_to_square(
         original_image,
         [com[0], com[1]],
         [com[2], com[3]],
-        resize_to=768,
+        resize_to=resize_to,
         padding=padding,
     )
     mask, _, _ = _crop_to_square_and_bounding_box(
-        mask_image, [com[0], com[1]], [com[2], com[3]], resize_to=768, padding=padding
+        mask_image,
+        [com[0], com[1]],
+        [com[2], com[3]],
+        resize_to=resize_to,
+        padding=padding,
     )
 
     control, _, _ = _crop_to_square_and_bounding_box(
         control_image,
         [com[0], com[1]],
         [com[2], com[3]],
-        resize_to=768,
+        resize_to=resize_to,
         padding=padding,
     )
 

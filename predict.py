@@ -22,6 +22,7 @@ from diffusers import (
     StableDiffusionXLInpaintPipeline,
     ControlNetModel,
     StableDiffusionXLControlNetPipeline,
+    StableDiffusionXLControlNetInpaintPipeline,
 )
 from diffusers.models.attention_processor import LoRAAttnProcessor2_0
 from diffusers.pipelines.stable_diffusion.safety_checker import (
@@ -44,7 +45,7 @@ import math
 
 from dataset_and_utils import TokenEmbeddingsHandler
 
-from image_processing import face_mask_google_mediapipe
+from image_processing import face_mask_google_mediapipe, crop_faces_to_square
 
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
@@ -270,6 +271,14 @@ class Predictor(BasePredictor):
         mask_blur_amount: float = Input(
             description="Amount of blur to apply to the mask.", default=8.0
         ),
+        face_padding: float = Input(
+            description="Amount of padding (as percentage) to add to the face bounding box.",
+            default=0.5,
+        ),
+        face_resize_to: int = Input(
+            description="Resize the face bounding box to this size (in pixels).",
+            default=768,
+        ),
     ) -> List[Path]:
         # Check if there is a lora_url
         if lora_url == None:
@@ -494,6 +503,31 @@ class Predictor(BasePredictor):
             output_path = f"/tmp/out-{i}-mask.png"
             face_masks[i].save(output_path)
             output_paths.append(Path(output_path))
+
+        # Based on face detection, crop base image, mask image and pose image (if available)
+        # to the face and save them to output_paths
+        (
+            cropped_face,
+            cropped_mask,
+            cropped_control,
+            left_top,
+            orig_size,
+        ) = crop_faces_to_square(
+            output.images[0], face_masks[0], pose_image, face_padding, face_resize_to
+        )
+
+        # Add all cropped images to output
+        output_path = f"/tmp/out-cropped-face.png"
+        cropped_face.save(output_path)
+        output_paths.append(Path(output_path))
+
+        output_path = f"/tmp/out-cropped-mask.png"
+        cropped_mask.save(output_path)
+        output_paths.append(Path(output_path))
+
+        output_path = f"/tmp/out-cropped-control.png"
+        cropped_control.save(output_path)
+        output_paths.append(Path(output_path))
 
         if len(output_paths) == 0:
             raise Exception(
