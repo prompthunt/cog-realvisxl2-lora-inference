@@ -66,6 +66,13 @@ class KarrasDPM:
         return DPMSolverMultistepScheduler.from_config(config, use_karras_sigmas=True)
 
 
+class DPMPPSDEKarras:
+    def from_config(config):
+        return DPMSolverMultistepScheduler.from_config(
+            config, use_karras_sigmas=True, algorithm_type="sde-dpmsolver++"
+        )
+
+
 SCHEDULERS = {
     "DDIM": DDIMScheduler,
     "DPMSolverMultistep": DPMSolverMultistepScheduler,
@@ -74,6 +81,7 @@ SCHEDULERS = {
     "K_EULER_ANCESTRAL": EulerAncestralDiscreteScheduler,
     "K_EULER": EulerDiscreteScheduler,
     "PNDM": PNDMScheduler,
+    "DPM++SDEKarras": DPMPPSDEKarras,
 }
 
 
@@ -276,7 +284,7 @@ class Predictor(BasePredictor):
         ),
         negative_prompt: str = Input(
             description="Input Negative Prompt",
-            default="",
+            default="plastic, blurry, grainy, [deformed | disfigured], poorly drawn, [bad : wrong] anatomy, [extra | missing | floating | disconnected] limb, (mutated hands and fingers), blurry",
         ),
         image: Path = Input(
             description="Input image for img2img or inpaint mode",
@@ -292,7 +300,7 @@ class Predictor(BasePredictor):
         ),
         width: int = Input(
             description="Width of output image",
-            default=1024,
+            default=768,
         ),
         height: int = Input(
             description="Height of output image",
@@ -307,13 +315,13 @@ class Predictor(BasePredictor):
         scheduler: str = Input(
             description="scheduler",
             choices=SCHEDULERS.keys(),
-            default="DPMSolverMultistep",
+            default="DPM++SDEKarras",
         ),
         num_inference_steps: int = Input(
             description="Number of denoising steps", ge=1, le=500, default=50
         ),
         guidance_scale: float = Input(
-            description="Scale for classifier-free guidance", ge=1, le=50, default=7.5
+            description="Scale for classifier-free guidance", ge=1, le=50, default=3
         ),
         prompt_strength: float = Input(
             description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
@@ -354,18 +362,18 @@ class Predictor(BasePredictor):
         ),
         face_padding: float = Input(
             description="Amount of padding (as percentage) to add to the face bounding box.",
-            default=0.5,
+            default=1,
         ),
         face_resize_to: int = Input(
             description="Resize the face bounding box to this size (in pixels).",
-            default=768,
+            default=1024,
         ),
         inpaint_prompt: str = Input(
             description="Input inpaint prompt", default="A photo of TOK"
         ),
         inpaint_negative_prompt: str = Input(
             description="Input inpaint negative prompt",
-            default="(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch)",
+            default="(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
         ),
         inpaint_strength: float = Input(
             description="Prompt strength when using inpaint. 1.0 corresponds to full destruction of information in image",
@@ -384,6 +392,10 @@ class Predictor(BasePredictor):
             ge=1,
             le=50,
             default=3.0,
+        ),
+        controlnet_conditioning_scale: float = Input(
+            description="Scale for guidance for controlnet",
+            default=1.0,
         ),
     ) -> List[Path]:
         # Check if there is a lora_url
@@ -557,6 +569,7 @@ class Predictor(BasePredictor):
             loaded_image = self.load_image(pose_image)
             loaded_pose_image = loaded_image
             sdxl_kwargs["image"] = loaded_image
+            sdxl_kwargs["controlnet_conditioning_scale"] = controlnet_conditioning_scale
 
             # Get the dimensions (height and width) of the loaded image
             image_width, image_height = loaded_image.size
@@ -632,7 +645,7 @@ class Predictor(BasePredictor):
             output.images[i].save(output_path)
             output_paths.append(Path(output_path))
 
-        face_masks = face_mask_google_mediapipe(output.images, mask_blur_amount)
+        face_masks = face_mask_google_mediapipe(output.images, mask_blur_amount, 0)
 
         # Based on face detection, crop base image, mask image and pose image (if available)
         # to the face and save them to output_paths
@@ -680,6 +693,9 @@ class Predictor(BasePredictor):
         inpaint_kwargs["mask_image"] = cropped_mask
         if cropped_control:
             inpaint_kwargs["control_image"] = cropped_control
+            inpaint_kwargs[
+                "controlnet_conditioning_scale"
+            ] = controlnet_conditioning_scale
         inpaint_kwargs["width"] = cropped_face.width
         inpaint_kwargs["height"] = cropped_face.height
         inpaint_kwargs["strength"] = inpaint_strength
