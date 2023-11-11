@@ -742,6 +742,7 @@ class Predictor(BasePredictor):
             # Add upscaled final image to output
             output_path = f"/tmp/out-upscaled.png"
             upscaled_final.save(output_path)
+            output_paths.append(Path(output_path))
 
         if len(output_paths) == 0:
             raise Exception(
