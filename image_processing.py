@@ -265,7 +265,6 @@ def crop_faces_to_square(
 
 def paste_inpaint_into_original_image(
     original_image: Image.Image,
-    mask_image: Image.Image,
     left_top: Tuple[int, int],
     image_to_paste: Image.Image,
     paste_size: Tuple[int, int],
@@ -281,13 +280,10 @@ def paste_inpaint_into_original_image(
     # Resize the image to be pasted to the specified paste size
     image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)
 
-    # Resize mask as well
-    mask_image = mask_image.resize(paste_size, Image.Resampling.LANCZOS)
-
     # Create a copy of the original image to avoid modifying it directly
     final_image = original_image.copy()
 
     # Paste the new image into the original image at the specified coordinates
-    final_image.paste(image_to_paste, left_top, mask_image)
+    final_image.paste(image_to_paste, left_top)
 
     return final_image

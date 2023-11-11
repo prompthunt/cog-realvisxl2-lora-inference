@@ -714,7 +714,6 @@ class Predictor(BasePredictor):
 
         pasted_image = paste_inpaint_into_original_image(
             output.images[0],
-            cropped_mask,
             left_top,
             inpaint_result.images[0],
             orig_size,
