@@ -347,10 +347,6 @@ class Predictor(BasePredictor):
             description="For base_image_refiner, the number of steps to refine, defaults to num_inference_steps",
             default=None,
         ),
-        apply_watermark: bool = Input(
-            description="Applies a watermark to enable determining if an image is generated in downstream applications. If you have other provisions for generating or deploying images safely, you can use this to disable watermarking.",
-            default=True,
-        ),
         lora_scale: float = Input(
             description="LoRA additive scale. Only applicable on trained models.",
             ge=0.0,
@@ -396,6 +392,14 @@ class Predictor(BasePredictor):
         controlnet_conditioning_scale: float = Input(
             description="Scale for guidance for controlnet",
             default=1.0,
+        ),
+        upscale_face_image: bool = Input(
+            description="Upscales face image before inpainting",
+            default=False,
+        ),
+        upscale_final_image: bool = Input(
+            description="Upscales final image before returning",
+            default=False,
         ),
     ) -> List[Path]:
         # Check if there is a lora_url
@@ -683,7 +687,10 @@ class Predictor(BasePredictor):
             cropped_control.save(output_path)
             output_paths.append(Path(output_path))
 
-        upscaled_face = self.upscale_image_pil(cropped_face)
+        if upscale_face_image:
+            upscaled_face = self.upscale_image_pil(cropped_face)
+        else:
+            upscaled_face = cropped_face
 
         inpaint_kwargs = {}
 
@@ -696,8 +703,8 @@ class Predictor(BasePredictor):
             inpaint_kwargs[
                 "controlnet_conditioning_scale"
             ] = controlnet_conditioning_scale
-        inpaint_kwargs["width"] = cropped_face.width
-        inpaint_kwargs["height"] = cropped_face.height
+        inpaint_kwargs["width"] = upscaled_face.width
+        inpaint_kwargs["height"] = upscaled_face.height
         inpaint_kwargs["strength"] = inpaint_strength
         inpaint_kwargs["num_inference_steps"] = inpaint_num_inference_steps
         inpaint_kwargs["guidance_scale"] = inpaint_guidance_scale
@@ -728,6 +735,13 @@ class Predictor(BasePredictor):
         output_path = f"/tmp/out-pasted.png"
         pasted_image.save(output_path)
         output_paths.append(Path(output_path))
+
+        if upscale_final_image:
+            upscaled_final = self.upscale_image_pil(pasted_image)
+
+            # Add upscaled final image to output
+            output_path = f"/tmp/out-upscaled.png"
+            upscaled_final.save(output_path)
 
         if len(output_paths) == 0:
             raise Exception(
