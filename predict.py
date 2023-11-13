@@ -26,21 +26,13 @@ from diffusers import (
     StableDiffusionXLControlNetInpaintPipeline,
 )
 from diffusers.models.attention_processor import LoRAAttnProcessor2_0
-from diffusers.pipelines.stable_diffusion.safety_checker import (
-    StableDiffusionSafetyChecker,
-)
-from diffusers.utils import load_image
-from safetensors import safe_open
-from safetensors.torch import load_file
-from transformers import CLIPImageProcessor
 
-import json
+
+from safetensors.torch import load_file
 import requests
 from io import BytesIO
 import tarfile
-import torch
 from PIL import Image
-import shutil
 import math
 
 
@@ -61,6 +53,7 @@ import random
 
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
+JUGGER_MODEL_CACHE = "jugger-model-cache"
 
 
 class KarrasDPM:
@@ -418,7 +411,7 @@ class Predictor(BasePredictor):
             print("LORA")
             print("Loading ssd txt2img pipeline...")
             self.txt2img_pipe = StableDiffusionXLPipeline.from_pretrained(
-                MODEL_CACHE,
+                JUGGER_MODEL_CACHE,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
             )
@@ -443,50 +436,33 @@ class Predictor(BasePredictor):
                 vae=self.txt2img_pipe.vae,
             )
 
-            self.controlnet_pipe_img2img = StableDiffusionXLControlNetImg2ImgPipeline(
-                controlnet=self.controlnet,
-                text_encoder=self.txt2img_pipe.text_encoder,
-                text_encoder_2=self.txt2img_pipe.text_encoder_2,
-                tokenizer=self.txt2img_pipe.tokenizer,
-                tokenizer_2=self.txt2img_pipe.tokenizer_2,
-                unet=self.txt2img_pipe.unet,
-                scheduler=self.txt2img_pipe.scheduler,
-                vae=self.txt2img_pipe.vae,
+            print("Loading SDXL inpaint pipeline...")
+            self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+                MODEL_CACHE,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
             )
 
             print("Loading controlnet inpaint pipeline")
             self.controlnet_pipe_inpaint = StableDiffusionXLControlNetInpaintPipeline(
                 controlnet=self.controlnet,
-                text_encoder=self.txt2img_pipe.text_encoder,
-                text_encoder_2=self.txt2img_pipe.text_encoder_2,
-                tokenizer=self.txt2img_pipe.tokenizer,
-                tokenizer_2=self.txt2img_pipe.tokenizer_2,
-                unet=self.txt2img_pipe.unet,
-                scheduler=self.txt2img_pipe.scheduler,
-                vae=self.txt2img_pipe.vae,
-            )
-
-            print("Loading SDXL inpaint pipeline...")
-            self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
-                vae=self.txt2img_pipe.vae,
-                text_encoder=self.txt2img_pipe.text_encoder,
-                text_encoder_2=self.txt2img_pipe.text_encoder_2,
-                tokenizer=self.txt2img_pipe.tokenizer,
-                tokenizer_2=self.txt2img_pipe.tokenizer_2,
-                unet=self.txt2img_pipe.unet,
-                scheduler=self.txt2img_pipe.scheduler,
+                text_encoder=self.inpaint_pipe.text_encoder,
+                text_encoder_2=self.inpaint_pipe.text_encoder_2,
+                tokenizer=self.inpaint_pipe.tokenizer,
+                tokenizer_2=self.inpaint_pipe.tokenizer_2,
+                unet=self.inpaint_pipe.unet,
+                scheduler=self.inpaint_pipe.scheduler,
+                vae=self.inpaint_pipe.vae,
             )
 
             # TODO: LOAD ALL PIPELINE LORA WEIGHTS
             print("Loading ssd lora weights...")
-            self.load_trained_weights(lora_url, self.txt2img_pipe)
-            self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
-            self.load_trained_weights(lora_url, self.controlnet_pipe_img2img)
+            # self.load_trained_weights(lora_url, self.txt2img_pipe)
+            # self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
             self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
             self.load_trained_weights(lora_url, self.inpaint_pipe)
             self.txt2img_pipe.to("cuda")
             self.controlnet_pipe_txt2img.to("cuda")
-            self.controlnet_pipe_img2img.to("cuda")
             self.controlnet_pipe_inpaint.to("cuda")
             self.inpaint_pipe.to("cuda")
             self.is_lora = True
