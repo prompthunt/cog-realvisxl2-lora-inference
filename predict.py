@@ -437,7 +437,7 @@ class Predictor(BasePredictor):
             )
 
             print("Loading SDXL inpaint pipeline...")
-            self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+            self.inpaint_pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
                 MODEL_CACHE,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
