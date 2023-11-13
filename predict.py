@@ -57,6 +57,7 @@ from gfpgan import GFPGANer
 from realesrgan.utils import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 import cv2
+import random
 
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
@@ -564,7 +565,7 @@ class Predictor(BasePredictor):
         # for num_outputs
         for i in range(num_outputs):
             if seed is None:
-                seed = int.from_bytes(os.urandom(2), "big")
+                seed = random.randint(100000000, 900000000)
             else:
                 seed = int(seed + i)
             print(f"Using seed: {seed}")
