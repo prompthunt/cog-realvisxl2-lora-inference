@@ -318,4 +318,4 @@ def get_head_mask(
 
     # Apply blur amount
     pil_image_blur = pil_image.filter(ImageFilter.GaussianBlur(blur_amount))
-    return pil_image_blur, pil_image
+    return pil_image_blur
