@@ -50,6 +50,7 @@ from image_processing import (
     face_mask_google_mediapipe,
     crop_faces_to_square,
     paste_inpaint_into_original_image,
+    get_head_mask,
 )
 
 from gfpgan import GFPGANer
@@ -690,6 +691,13 @@ class Predictor(BasePredictor):
             cropped_mask.save(output_path)
             output_paths.append(Path(output_path))
 
+            head_mask = get_head_mask(cropped_face, mask_blur_amount)
+
+            # Add head mask to output
+            output_path = f"/tmp/out-head-mask.png"
+            head_mask.save(output_path)
+            output_paths.append(Path(output_path))
+
             if cropped_control:
                 output_path = f"/tmp/out-cropped-control.png"
                 cropped_control.save(output_path)
@@ -705,7 +713,7 @@ class Predictor(BasePredictor):
             inpaint_kwargs["prompt"] = inpaint_prompt
             inpaint_kwargs["negative_prompt"] = inpaint_negative_prompt
             inpaint_kwargs["image"] = upscaled_face
-            inpaint_kwargs["mask_image"] = cropped_mask
+            inpaint_kwargs["mask_image"] = head_mask
             if cropped_control:
                 inpaint_kwargs["control_image"] = cropped_control
                 inpaint_kwargs[
