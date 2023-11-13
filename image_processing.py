@@ -283,6 +283,9 @@ def paste_inpaint_into_original_image(
     # Resize the image to be pasted to the specified paste size
     image_to_paste = image_to_paste.resize(paste_size, Image.Resampling.LANCZOS)
 
+    # Convert mask_image from black and white to alpha channel, where grey is transparent
+    mask_image = mask_image.convert("L")
+
     # Resie the mask to be pasted to the specified paste size
     mask_image = mask_image.resize(paste_size, Image.Resampling.LANCZOS)
 
