@@ -403,6 +403,10 @@ class Predictor(BasePredictor):
             description="Upscales final image before returning",
             default=False,
         ),
+        include_debug_output_images: bool = Input(
+            description="Include debug output in the output",
+            default=True,
+        ),
     ) -> List[Path]:
         # Check if there is a lora_url
         if lora_url == None:
@@ -692,7 +696,7 @@ class Predictor(BasePredictor):
             cropped_mask.save(output_path)
             output_paths.append(Path(output_path))
 
-            head_mask = get_head_mask(cropped_face, mask_blur_amount)
+            head_mask, head_mask_no_blur = get_head_mask(cropped_face, mask_blur_amount)
 
             # Add head mask to output
             output_path = f"/tmp/out-head-mask.png"
@@ -738,7 +742,7 @@ class Predictor(BasePredictor):
 
             pasted_image = paste_inpaint_into_original_image(
                 output.images[0],
-                head_mask,
+                head_mask_no_blur,
                 left_top,
                 inpaint_result.images[0],
                 orig_size,
