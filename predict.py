@@ -568,11 +568,11 @@ class Predictor(BasePredictor):
         output_paths = []
 
         # for num_outputs
-        for i in range(num_outputs):
+        for image_index in range(num_outputs):
             if seed is None:
                 seed = random.randint(100000000, 900000000)
             else:
-                seed = int(seed + i)
+                seed = int(seed + image_index)
             print(f"Using seed: {seed}")
 
             sdxl_kwargs = {}
@@ -678,7 +678,7 @@ class Predictor(BasePredictor):
 
             if include_debug_output_images:
                 for i, _ in enumerate(output.images):
-                    output_path = f"/tmp/out-{i}.png"
+                    output_path = f"/tmp/out-{image_index}-{i}.png"
                     output.images[i].save(output_path)
                     output_paths.append(Path(output_path))
 
@@ -703,16 +703,16 @@ class Predictor(BasePredictor):
             # Add face masks to output
             if include_debug_output_images:
                 for i, _ in enumerate(face_masks):
-                    output_path = f"/tmp/out-{i}-mask.png"
+                    output_path = f"/tmp/out-{image_index}-{i}-mask.png"
                     face_masks[i].save(output_path)
                     output_paths.append(Path(output_path))
 
                 # Add all cropped images to output
-                output_path = f"/tmp/out-cropped-face.png"
+                output_path = f"/tmp/out-cropped-face-{image_index}.png"
                 cropped_face.save(output_path)
                 output_paths.append(Path(output_path))
 
-                output_path = f"/tmp/out-cropped-mask.png"
+                output_path = f"/tmp/out-cropped-mask-{image_index}.png"
                 cropped_mask.save(output_path)
                 output_paths.append(Path(output_path))
 
@@ -720,12 +720,12 @@ class Predictor(BasePredictor):
 
             if include_debug_output_images:
                 # Add head mask to output
-                output_path = f"/tmp/out-head-mask.png"
+                output_path = f"/tmp/out-head-mask-{image_index}.png"
                 head_mask.save(output_path)
                 output_paths.append(Path(output_path))
 
             if cropped_control and include_debug_output_images:
-                output_path = f"/tmp/out-cropped-control.png"
+                output_path = f"/tmp/out-cropped-control-{image_index}.png"
                 cropped_control.save(output_path)
                 output_paths.append(Path(output_path))
 
@@ -771,14 +771,14 @@ class Predictor(BasePredictor):
 
             if include_debug_output_images:
                 # Add inpaint result to output
-                output_path = f"/tmp/out-inpaint.png"
+                output_path = f"/tmp/out-inpaint-{image_index}.png"
                 inpaint_result.images[0].save(output_path)
                 output_paths.append(Path(output_path))
 
             # If there is no upscale, or if debug is enabled
             if not upscale_face_image or include_debug_output_images:
                 # Add pasted image to output
-                output_path = f"/tmp/out-pasted.png"
+                output_path = f"/tmp/out-pasted-{image_index}.png"
                 pasted_image.save(output_path)
                 output_paths.append(Path(output_path))
 
@@ -786,7 +786,7 @@ class Predictor(BasePredictor):
                 upscaled_final = self.upscale_image_pil(pasted_image)
 
                 # Add upscaled final image to output
-                output_path = f"/tmp/out-upscaled.png"
+                output_path = f"/tmp/out-upscaled-{image_index}.png"
                 upscaled_final.save(output_path)
                 output_paths.append(Path(output_path))
 
