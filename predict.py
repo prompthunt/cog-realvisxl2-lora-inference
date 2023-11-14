@@ -597,6 +597,7 @@ class Predictor(BasePredictor):
 
                 sdxl_kwargs["target_size"] = (image_width, image_height)
                 sdxl_kwargs["original_size"] = (image_width, image_height)
+                sdxl_kwargs["strength"] = prompt_strength
                 pipe = self.controlnet_pipe_img2img
             elif pose_image:
                 print("controlnet mode")
