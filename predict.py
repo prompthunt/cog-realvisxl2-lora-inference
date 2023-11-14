@@ -53,7 +53,6 @@ import random
 
 MODEL_NAME = "SG161222/RealVisXL_V2.0"
 MODEL_CACHE = "model-cache"
-JUGGER_MODEL_CACHE = "jugger-model-cache"
 
 
 class KarrasDPM:
@@ -411,9 +410,32 @@ class Predictor(BasePredictor):
             print("LORA")
             print("Loading ssd txt2img pipeline...")
             self.txt2img_pipe = StableDiffusionXLPipeline.from_pretrained(
-                JUGGER_MODEL_CACHE,
+                MODEL_CACHE,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
+            )
+
+            print("Loading SDXL img2img pipeline...")
+            self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
+                vae=self.txt2img_pipe.vae,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+            )
+            self.img2img_pipe.to("cuda")
+
+            print("Loading SDXL inpaint pipeline...")
+            self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
             )
 
             print("Loading controlnet model")
@@ -436,48 +458,57 @@ class Predictor(BasePredictor):
                 vae=self.txt2img_pipe.vae,
             )
 
-            print("Loading SDXL inpaint pipeline...")
-            self.inpaint_pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
-                MODEL_CACHE,
-                torch_dtype=torch.float16,
-                use_safetensors=True,
+            print("Loading controlnet inpaint pipeline")
+            self.controlnet_pipe_img2img = StableDiffusionXLControlNetImg2ImgPipeline(
+                controlnet=self.controlnet,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
             )
 
             print("Loading controlnet inpaint pipeline")
             self.controlnet_pipe_inpaint = StableDiffusionXLControlNetInpaintPipeline(
                 controlnet=self.controlnet,
-                text_encoder=self.inpaint_pipe.text_encoder,
-                text_encoder_2=self.inpaint_pipe.text_encoder_2,
-                tokenizer=self.inpaint_pipe.tokenizer,
-                tokenizer_2=self.inpaint_pipe.tokenizer_2,
-                unet=self.inpaint_pipe.unet,
-                scheduler=self.inpaint_pipe.scheduler,
-                vae=self.inpaint_pipe.vae,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+                vae=self.txt2img_pipe.vae,
             )
 
             # TODO: LOAD ALL PIPELINE LORA WEIGHTS
             print("Loading ssd lora weights...")
-            # self.load_trained_weights(lora_url, self.txt2img_pipe)
-            # self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
-            self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
+            self.load_trained_weights(lora_url, self.txt2img_pipe)
+            self.load_trained_weights(lora_url, self.img2img_pipe)
             self.load_trained_weights(lora_url, self.inpaint_pipe)
+            self.load_trained_weights(lora_url, self.controlnet_pipe_txt2img)
+            self.load_trained_weights(lora_url, self.controlnet_pipe_img2img)
+            self.load_trained_weights(lora_url, self.controlnet_pipe_inpaint)
             self.txt2img_pipe.to("cuda")
-            self.controlnet_pipe_txt2img.to("cuda")
-            self.controlnet_pipe_inpaint.to("cuda")
+            self.img2img_pipe.to("cuda")
             self.inpaint_pipe.to("cuda")
+            self.controlnet_pipe_txt2img.to("cuda")
+            self.controlnet_pipe_img2img.to("cuda")
+            self.controlnet_pipe_inpaint.to("cuda")
             self.is_lora = True
 
             # print("Loading SDXL img2img pipeline...")
-            # self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
-            #     vae=self.txt2img_pipe.vae,
-            #     text_encoder=self.txt2img_pipe.text_encoder,
-            #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            #     tokenizer=self.txt2img_pipe.tokenizer,
-            #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            #     unet=self.txt2img_pipe.unet,
-            #     scheduler=self.txt2img_pipe.scheduler,
-            # )
-            # self.img2img_pipe.to("cuda")
+            self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
+                vae=self.txt2img_pipe.vae,
+                text_encoder=self.txt2img_pipe.text_encoder,
+                text_encoder_2=self.txt2img_pipe.text_encoder_2,
+                tokenizer=self.txt2img_pipe.tokenizer,
+                tokenizer_2=self.txt2img_pipe.tokenizer_2,
+                unet=self.txt2img_pipe.unet,
+                scheduler=self.txt2img_pipe.scheduler,
+            )
+            self.img2img_pipe.to("cuda")
 
             # print("Loading SDXL refiner pipeline...")
 
@@ -503,18 +534,6 @@ class Predictor(BasePredictor):
             self.is_lora = False
 
             self.txt2img_pipe.to("cuda")
-
-            # print("Loading SDXL img2img pipeline...")
-            # self.img2img_pipe = StableDiffusionXLImg2ImgPipeline(
-            #     vae=self.txt2img_pipe.vae,
-            #     text_encoder=self.txt2img_pipe.text_encoder,
-            #     text_encoder_2=self.txt2img_pipe.text_encoder_2,
-            #     tokenizer=self.txt2img_pipe.tokenizer,
-            #     tokenizer_2=self.txt2img_pipe.tokenizer_2,
-            #     unet=self.txt2img_pipe.unet,
-            #     scheduler=self.txt2img_pipe.scheduler,
-            # )
-            # self.img2img_pipe.to("cuda")
 
             # print("Loading SDXL inpaint pipeline...")
             # self.inpaint_pipe = StableDiffusionXLInpaintPipeline(
@@ -557,7 +576,23 @@ class Predictor(BasePredictor):
                     prompt = prompt.replace(k, v)
             print(f"Prompt: {prompt}")
             loaded_pose_image = None
-            if pose_image:
+            if pose_image and image:
+                print("controlnet img2img mode")
+                loaded_image = self.load_image(image)
+                loaded_pose_image = self.load_image(pose_image)
+                sdxl_kwargs["image"] = loaded_image
+                sdxl_kwargs["control_image"] = loaded_pose_image
+                sdxl_kwargs[
+                    "controlnet_conditioning_scale"
+                ] = controlnet_conditioning_scale
+
+                # Get the dimensions (height and width) of the loaded image
+                image_width, image_height = loaded_image.size
+
+                sdxl_kwargs["target_size"] = (image_width, image_height)
+                sdxl_kwargs["original_size"] = (image_width, image_height)
+                pipe = self.controlnet_pipe_img2img
+            elif pose_image:
                 print("controlnet mode")
                 loaded_image = self.load_image(pose_image)
                 loaded_pose_image = loaded_image
