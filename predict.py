@@ -312,7 +312,7 @@ class Predictor(BasePredictor):
             default="DPM++SDEKarras",
         ),
         num_inference_steps: int = Input(
-            description="Number of denoising steps", ge=1, le=500, default=50
+            description="Number of denoising steps", ge=1, le=500, default=25
         ),
         guidance_scale: float = Input(
             description="Scale for classifier-free guidance", ge=1, le=50, default=3
@@ -345,14 +345,14 @@ class Predictor(BasePredictor):
             description="LoRA additive scale. Only applicable on trained models.",
             ge=0.0,
             le=1.0,
-            default=0.6,
+            default=0.8,
         ),
         mask_blur_amount: float = Input(
             description="Amount of blur to apply to the mask.", default=8.0
         ),
         face_padding: float = Input(
             description="Amount of padding (as percentage) to add to the face bounding box.",
-            default=1,
+            default=1.5,
         ),
         face_resize_to: int = Input(
             description="Resize the face bounding box to this size (in pixels).",
@@ -387,7 +387,7 @@ class Predictor(BasePredictor):
             description="LoRA additive scale. Only applicable on trained models.",
             ge=0.0,
             le=1.0,
-            default=0.6,
+            default=0.8,
         ),
         controlnet_conditioning_scale: float = Input(
             description="Scale for guidance for controlnet",
