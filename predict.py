@@ -383,6 +383,12 @@ class Predictor(BasePredictor):
             le=50,
             default=3.0,
         ),
+        inpaint_lora_scale: float = Input(
+            description="LoRA additive scale. Only applicable on trained models.",
+            ge=0.0,
+            le=1.0,
+            default=0.6,
+        ),
         controlnet_conditioning_scale: float = Input(
             description="Scale for guidance for controlnet",
             default=1.0,
@@ -653,7 +659,7 @@ class Predictor(BasePredictor):
             }
 
             if self.is_lora:
-                sdxl_kwargs["cross_attention_kwargs"] = {"scale": 0}
+                sdxl_kwargs["cross_attention_kwargs"] = {"scale": lora_scale}
 
             output = pipe(**common_args, **sdxl_kwargs)
 
@@ -744,7 +750,7 @@ class Predictor(BasePredictor):
             inpaint_kwargs["num_inference_steps"] = inpaint_num_inference_steps
             inpaint_kwargs["guidance_scale"] = inpaint_guidance_scale
             inpaint_kwargs["generator"] = torch.Generator("cuda").manual_seed(seed)
-            inpaint_kwargs["cross_attention_kwargs"] = {"scale": lora_scale}
+            inpaint_kwargs["cross_attention_kwargs"] = {"scale": inpaint_lora_scale}
 
             if cropped_control:
                 inpaint_result = self.controlnet_pipe_inpaint(
