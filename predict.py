@@ -754,10 +754,16 @@ class Predictor(BasePredictor):
             inpaint_kwargs["cross_attention_kwargs"] = {"scale": inpaint_lora_scale}
 
             if cropped_control:
+                self.controlnet_pipe_inpaint.scheduler = SCHEDULERS[
+                    scheduler
+                ].from_config(self.controlnet_pipe_inpaint.scheduler.config)
                 inpaint_result = self.controlnet_pipe_inpaint(
                     **inpaint_kwargs,
                 )
             else:
+                self.inpaint_pipe.scheduler = SCHEDULERS[scheduler].from_config(
+                    self.inpaint_pipe.scheduler.config
+                )
                 inpaint_result = self.inpaint_pipe(
                     **inpaint_kwargs,
                 )
